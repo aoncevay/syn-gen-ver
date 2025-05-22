@@ -10,50 +10,72 @@ from pathlib import Path
 # Import our configuration
 from .config import get_config
 
-# Load spaCy model based on configuration
-config = get_config()
-spacy_config = config.get_spacy_model_info()
-model_name = spacy_config.get("name", "en_core_web_sm")
-local_path = spacy_config.get("local_path", None)
-use_local_model = spacy_config.get("use_local_model", False)
-
-try:
-    if use_local_model and local_path:
-        # Path to the manually downloaded model
-        model_path = Path(local_path)
+class SpacyModelManager:
+    """
+    Class to manage the loading and caching of the spaCy model.
+    Implements the Singleton pattern to ensure only one instance exists.
+    """
+    _instance = None
+    _model = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SpacyModelManager, cls).__new__(cls)
+            cls._instance._config = get_config()
+            cls._instance._spacy_config = cls._instance._config.get_spacy_model_info()
+        return cls._instance
+    
+    def get_model(self):
+        """
+        Get the spaCy model, loading it if necessary.
         
-        if model_path.exists():
-            print(f"Loading spaCy model from local path: {model_path}")
-            # Load from the specified path
-            if importlib.util.find_spec("spacy.cli.info") is not None:
-                # This approach works with newer spaCy versions
-                nlp = spacy.load(model_path)
+        Returns:
+            The loaded spaCy model or None if loading fails
+        """
+        # Return cached model if already loaded
+        if self._model is not None:
+            return self._model
+        
+        # Get model configuration
+        model_name = self._spacy_config.get("name", "en_core_web_sm")
+        local_path = self._spacy_config.get("local_path", None)
+        use_local_model = self._spacy_config.get("use_local_model", False)
+        
+        try:
+            if use_local_model and local_path:
+                # Path to the local model
+                model_path = Path(local_path)
+                
+                if model_path.exists():
+                    print(f"Loading spaCy model from local path: {model_path}")
+                    # Load from the specified path
+                    self._model = spacy.load(model_path)
+                else:
+                    print(f"Warning: Local model path {model_path} not found, falling back to installed model")
+                    self._model = spacy.load(model_name)
             else:
-                # Alternative approach for older spaCy versions
-                model_path_str = str(model_path)
-                sys.path.insert(0, model_path_str)
-                nlp = importlib.import_module(model_name).load()
-                sys.path.pop(0)
-        else:
-            print(f"Warning: Local model path {model_path} not found, falling back to installed model")
-            nlp = spacy.load(model_name)
-    else:
-        # Load the installed model
-        nlp = spacy.load(model_name)
+                # Load the installed model
+                print(f"Loading spaCy model: {model_name}")
+                self._model = spacy.load(model_name)
+                
+        except OSError as e:
+            print(f"Error loading spaCy model: {e}")
+            print("Attempting to download the model...")
+            try:
+                # If the model is not installed, we need to install it
+                import subprocess
+                subprocess.check_call([sys.executable, "-m", "spacy", "download", model_name])
+                self._model = spacy.load(model_name)
+            except Exception as download_error:
+                print(f"Failed to download spaCy model: {download_error}")
+                print("Using a simpler approach for entity recognition...")
+                # Fallback to a very simple entity recognition method
+                self._model = None
         
-except OSError as e:
-    print(f"Error loading spaCy model: {e}")
-    print("Attempting to download the model...")
-    try:
-        # If the model is not installed, we need to install it
-        import subprocess
-        subprocess.check_call([sys.executable, "-m", "spacy", "download", model_name])
-        nlp = spacy.load(model_name)
-    except Exception as download_error:
-        print(f"Failed to download spaCy model: {download_error}")
-        print("Using a simpler approach for entity recognition...")
-        # Fallback to a very simple entity recognition method
-        nlp = None
+        return self._model
+
+# Initialize a global model manager (but don't load the model yet)
+model_manager = SpacyModelManager()
 
 def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
     """
@@ -65,12 +87,15 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
     Returns:
         Tuple of (original_text, list_of_entities, start_index, end_index) or None if no list found
     """
-    if nlp is None:
+    # Get the model from the manager (loads it if needed)
+    model = model_manager.get_model()
+    
+    if model is None:
         # Fallback method if spaCy is not available
         return _find_entity_list_simple(text)
     
     # Process the text with spaCy
-    doc = nlp(text)
+    doc = model(text)
     
     # Extract entities of type PERSON or ORG
     entities = [(ent.text, ent.start_char, ent.end_char, ent.label_) 

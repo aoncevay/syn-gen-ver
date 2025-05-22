@@ -1,6 +1,6 @@
 # NLP libraries
 nltk
-spacy
+spacy=3.8.2
 # Note: You don't need to install the standalone wordnet package as it's included in NLTK
 
 # Core dependencies
