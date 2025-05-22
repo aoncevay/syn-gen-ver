@@ -1,0 +1,11 @@
+# NLP libraries
+nltk>=3.8.1
+spacy>=3.7.2
+wordnet>=0.0.1b2
+
+# Core dependencies
+numpy>=1.26.3
+regex>=2023.10.3
+
+# Download the English language model for spaCy
+# Run: python -m spacy download en_core_web_sm 
