@@ -230,7 +230,3 @@ The system includes fallback mechanisms when NLP resources aren't available:
 - **Entity Recognition**: Falls back to regex-based pattern matching for entities
 - **Synonym Replacement**: Uses a built-in dictionary of common words and their synonyms
 - **Sentence Tokenization**: Falls back to simple rule-based sentence splitting
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
