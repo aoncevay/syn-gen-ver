@@ -1,7 +1,7 @@
 {
     "spacy_model": {
         "name": "en_core_web_trf",
-        "local_path": "models/en_core_web_trf",
+        "local_path": "models/en_core_web_trf-3.8.0",
         "use_local_model": true
     },
     "nltk": {

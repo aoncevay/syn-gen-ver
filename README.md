@@ -22,12 +22,13 @@ syn-gen-ver/              # Project root
 ├── data/                 # Input and output data
 │   └── sample.json       # Sample input data
 ├── models/               # Language models directory
-│   └── en_core_web_trf/  # SpaCy model files
+│   └── en_core_web_trf-3.8.0/  # Extracted spaCy model files
 ├── src/                  # Source code
 │   ├── config.json       # Configuration file
 │   ├── main.py           # Main script
 │   ├── perturbation/     # Perturbation modules
 │   └── tests/            # Unit tests
+├── setup_model.sh        # Script to install models
 └── requirements.txt      # Dependencies
 ```
 
@@ -65,31 +66,33 @@ python -m spacy download en_core_web_sm
 If you're working in an environment with restricted internet access or package installation limitations:
 
 1. Manually download the spaCy model from [the spaCy models page](https://spacy.io/models)
+   - The downloaded file will typically have a name like `en_core_web_trf-3.8.0-py3-none-any.whl`
 
-2. Place the downloaded model in a directory of your choice, e.g., `models/en_core_web_trf/`
+2. Place the downloaded wheel file in the models directory:
+   ```
+   models/en_core_web_trf-3.8.0-py3-none-any.whl
+   ```
 
-3. Create or modify the `config.json` file in the project root or `src/` directory:
+3. Use the setup script to install and configure the model:
 
-```json
-{
-    "spacy_model": {
-        "name": "en_core_web_trf",
-        "local_path": "models/en_core_web_trf",
-        "use_local_model": true
-    },
-    "nltk": {
-        "data_path": "nltk_data",
-        "download_enabled": false
-    }
-}
-```
+   ```bash
+   # For local installation (extracts to models/ directory)
+   chmod +x setup_model.sh
+   ./setup_model.sh models/en_core_web_trf-3.8.0-py3-none-any.whl local
+   
+   # OR for global installation (using pip)
+   ./setup_model.sh models/en_core_web_trf-3.8.0-py3-none-any.whl global
+   ```
+
+   The script will:
+   - Extract/install the model
+   - Update the config.json file automatically
+   - Create a backup of the original config
 
 4. Manually download NLTK data (if needed):
    - Visit the [NLTK data page](https://www.nltk.org/nltk_data/)
    - Download the required packages (punkt, wordnet, averaged_perceptron_tagger)
-   - Place them in the directory specified in `nltk.data_path`
-
-5. The system includes fallback mechanisms if NLP resources aren't available.
+   - Place them in a directory and update the `nltk.data_path` in config.json
 
 ## Usage
 
@@ -155,9 +158,9 @@ The system can be configured using a `config.json` file in the project root or `
 ```json
 {
     "spacy_model": {
-        "name": "en_core_web_sm",          // Name of the spaCy model to use
-        "local_path": "models/spacy_model", // Path to manually downloaded model
-        "use_local_model": false           // Whether to use the local model
+        "name": "en_core_web_trf",          // Name of the spaCy model to use
+        "local_path": "models/en_core_web_trf-3.8.0",  // Path to extracted model (if use_local_model is true)
+        "use_local_model": true             // Whether to use a local model or installed model
     },
     "nltk": {
         "data_path": null,                 // Custom path to NLTK data
@@ -200,14 +203,6 @@ The output file will be a JSON file containing a list of dictionaries with the f
 ]
 ```
 
-## Running Tests
-
-Run the unit tests for each perturbation module:
-
-```bash
-python -m unittest discover src/tests
-```
-
 ## Extending the Project
 
 To add new perturbation types:
@@ -220,8 +215,12 @@ To add new perturbation types:
 ## Troubleshooting
 
 - **Path Issues**: If you encounter path-related errors, make sure you're running the commands from the project root directory.
-- **Model Not Found**: Verify that the path in your config.json correctly points to where you placed the downloaded model.
+- **Model Not Found**: Verify that the path in your config.json correctly points to where you placed the extracted model.
 - **Import Errors**: Ensure your Python environment has all required dependencies installed.
+- **Model Installation Issues**: 
+  - For issues with the wheel file, run the setup script with the appropriate parameters
+  - Check the model name matches what's in your config.json
+  - For manual installations, ensure the spaCy model version is compatible with your Python version
 
 ## Fallback Mechanisms
 
