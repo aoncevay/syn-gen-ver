@@ -13,6 +13,24 @@ The system currently supports four types of perturbations:
 
 Each statement is perturbed with only one single perturbation.
 
+## Directory Structure
+
+The recommended directory structure for this project is:
+
+```
+syn-gen-ver/              # Project root
+├── data/                 # Input and output data
+│   └── sample.json       # Sample input data
+├── models/               # Language models directory
+│   └── en_core_web_trf/  # SpaCy model files
+├── src/                  # Source code
+│   ├── config.json       # Configuration file
+│   ├── main.py           # Main script
+│   ├── perturbation/     # Perturbation modules
+│   └── tests/            # Unit tests
+└── requirements.txt      # Dependencies
+```
+
 ## Setup
 
 ### Standard Setup
@@ -75,11 +93,16 @@ If you're working in an environment with restricted internet access or package i
 
 ## Usage
 
+### Running the Script
+
+All commands should be run from the project root directory to ensure that file paths resolve correctly.
+
 ### Basic Usage
 
 Process statements from an input JSON file and save the perturbed statements to an output file:
 
 ```bash
+# Run from the project root directory
 python src/main.py --input data/sample.json --output data/perturbed.json
 ```
 
@@ -95,6 +118,34 @@ python src/main.py --input data/sample.json --output data/perturbed.json --max 1
 
 ```bash
 python src/main.py --input data/sample.json --output data/perturbed.json --seed 42
+```
+
+- Specify a custom configuration file:
+
+```bash
+python src/main.py --input data/sample.json --output data/perturbed.json --config my_custom_config.json
+```
+
+### Running Tests
+
+Run the tests from the project root directory to ensure all paths resolve correctly:
+
+```bash
+# Run all tests
+python -m unittest discover src/tests
+```
+
+You can also run specific test files, classes, or methods:
+
+```bash
+# Run a specific test file
+python -m unittest src/tests/test_date_format.py
+
+# Run a specific test class
+python -m unittest src.tests.test_date_format.TestDateFormat
+
+# Run a specific test method
+python -m unittest src.tests.test_date_format.TestDateFormat.test_find_date_format_numeric
 ```
 
 ## Configuration
@@ -165,6 +216,12 @@ To add new perturbation types:
 2. Implement a main function called `perturb_new_perturbation` that takes a text string and returns a dictionary with perturbation details or None if no perturbation is possible.
 3. Register the new perturbation in `src/perturbation/__init__.py`.
 4. Add unit tests in the `src/tests` directory.
+
+## Troubleshooting
+
+- **Path Issues**: If you encounter path-related errors, make sure you're running the commands from the project root directory.
+- **Model Not Found**: Verify that the path in your config.json correctly points to where you placed the downloaded model.
+- **Import Errors**: Ensure your Python environment has all required dependencies installed.
 
 ## Fallback Mechanisms
 
