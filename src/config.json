@@ -1,0 +1,14 @@
+{
+    "spacy_model": {
+        "name": "en_core_web_trf",
+        "local_path": "models/en_core_web_trf",
+        "use_local_model": true
+    },
+    "nltk": {
+        "data_path": null,
+        "download_enabled": false
+    },
+    "perturbation": {
+        "enabled_types": ["date_format", "entity_reorder", "number_rephrase", "synonym"]
+    }
+} 

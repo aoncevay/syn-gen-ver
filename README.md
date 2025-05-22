@@ -15,6 +15,8 @@ Each statement is perturbed with only one single perturbation.
 
 ## Setup
 
+### Standard Setup
+
 1. Clone the repository:
 
 ```bash
@@ -40,6 +42,37 @@ python -c "import nltk; nltk.download('punkt'); nltk.download('wordnet'); nltk.d
 python -m spacy download en_core_web_sm
 ```
 
+### Setup for Restricted Environments
+
+If you're working in an environment with restricted internet access or package installation limitations:
+
+1. Manually download the spaCy model from [the spaCy models page](https://spacy.io/models)
+
+2. Place the downloaded model in a directory of your choice, e.g., `models/en_core_web_trf/`
+
+3. Create or modify the `config.json` file in the project root or `src/` directory:
+
+```json
+{
+    "spacy_model": {
+        "name": "en_core_web_trf",
+        "local_path": "models/en_core_web_trf",
+        "use_local_model": true
+    },
+    "nltk": {
+        "data_path": "nltk_data",
+        "download_enabled": false
+    }
+}
+```
+
+4. Manually download NLTK data (if needed):
+   - Visit the [NLTK data page](https://www.nltk.org/nltk_data/)
+   - Download the required packages (punkt, wordnet, averaged_perceptron_tagger)
+   - Place them in the directory specified in `nltk.data_path`
+
+5. The system includes fallback mechanisms if NLP resources aren't available.
+
 ## Usage
 
 ### Basic Usage
@@ -62,6 +95,27 @@ python src/main.py --input data/sample.json --output data/perturbed.json --max 1
 
 ```bash
 python src/main.py --input data/sample.json --output data/perturbed.json --seed 42
+```
+
+## Configuration
+
+The system can be configured using a `config.json` file in the project root or `src/` directory. Available configuration options:
+
+```json
+{
+    "spacy_model": {
+        "name": "en_core_web_sm",          // Name of the spaCy model to use
+        "local_path": "models/spacy_model", // Path to manually downloaded model
+        "use_local_model": false           // Whether to use the local model
+    },
+    "nltk": {
+        "data_path": null,                 // Custom path to NLTK data
+        "download_enabled": true           // Whether to allow downloading NLTK resources
+    },
+    "perturbation": {
+        "enabled_types": ["date_format", "entity_reorder", "number_rephrase", "synonym"]
+    }
+}
 ```
 
 ## Input Format
@@ -111,3 +165,15 @@ To add new perturbation types:
 2. Implement a main function called `perturb_new_perturbation` that takes a text string and returns a dictionary with perturbation details or None if no perturbation is possible.
 3. Register the new perturbation in `src/perturbation/__init__.py`.
 4. Add unit tests in the `src/tests` directory.
+
+## Fallback Mechanisms
+
+The system includes fallback mechanisms when NLP resources aren't available:
+
+- **Entity Recognition**: Falls back to regex-based pattern matching for entities
+- **Synonym Replacement**: Uses a built-in dictionary of common words and their synonyms
+- **Sentence Tokenization**: Falls back to simple rule-based sentence splitting
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

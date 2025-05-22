@@ -2,19 +2,107 @@ import re
 import random
 from typing import Optional, List, Tuple, Dict, Any
 import nltk
-from nltk.corpus import wordnet
+import os
 
-# Ensure WordNet is downloaded
+# Import our configuration
+from .config import get_config
+
+config = get_config()
+nltk_config = config.get("nltk", {})
+nltk_download_enabled = nltk_config.get("download_enabled", True)
+nltk_data_path = nltk_config.get("data_path")
+
+# Add custom NLTK data path if configured
+if nltk_data_path:
+    nltk.data.path.append(nltk_data_path)
+
+# Flag to track if we have WordNet available
+wordnet_available = False
+punkt_available = False
+tagger_available = False
+
+# Try to access the resources, download if allowed and needed
 try:
     nltk.data.find('corpora/wordnet')
+    from nltk.corpus import wordnet
+    wordnet_available = True
 except LookupError:
-    nltk.download('wordnet', quiet=True)
+    if nltk_download_enabled:
+        try:
+            nltk.download('wordnet', quiet=True)
+            from nltk.corpus import wordnet
+            wordnet_available = True
+        except Exception as e:
+            print(f"Could not download or use WordNet: {e}")
+            # Create dummy wordnet constants for compatibility
+            class DummyWordNet:
+                ADJ = 'a'
+                VERB = 'v'
+                NOUN = 'n'
+                ADV = 'r'
+            wordnet = DummyWordNet()
+    else:
+        print("WordNet not available and downloads disabled")
+        # Create dummy wordnet constants for compatibility
+        class DummyWordNet:
+            ADJ = 'a'
+            VERB = 'v'
+            NOUN = 'n'
+            ADV = 'r'
+        wordnet = DummyWordNet()
 
-# Also need part-of-speech tagging
+# Try to access the tokenizer, download if allowed and needed
+try:
+    nltk.data.find('tokenizers/punkt')
+    punkt_available = True
+except LookupError:
+    if nltk_download_enabled:
+        try:
+            nltk.download('punkt', quiet=True)
+            punkt_available = True
+        except Exception as e:
+            print(f"Could not download or use Punkt tokenizer: {e}")
+    else:
+        print("Punkt tokenizer not available and downloads disabled")
+
+# Try to access the POS tagger, download if allowed and needed
 try:
     nltk.data.find('taggers/averaged_perceptron_tagger')
+    tagger_available = True
 except LookupError:
-    nltk.download('averaged_perceptron_tagger', quiet=True)
+    if nltk_download_enabled:
+        try:
+            nltk.download('averaged_perceptron_tagger', quiet=True)
+            tagger_available = True
+        except Exception as e:
+            print(f"Could not download or use POS tagger: {e}")
+    else:
+        print("POS tagger not available and downloads disabled")
+
+# Fallback simple word synonyms for common words
+SIMPLE_SYNONYMS = {
+    'big': ['large', 'huge', 'enormous', 'substantial', 'significant'],
+    'small': ['tiny', 'little', 'miniature', 'minute', 'compact'],
+    'good': ['great', 'excellent', 'fine', 'quality', 'superior'],
+    'bad': ['poor', 'inferior', 'substandard', 'inadequate', 'unsatisfactory'],
+    'important': ['significant', 'crucial', 'essential', 'vital', 'key'],
+    'company': ['business', 'corporation', 'enterprise', 'firm', 'organization'],
+    'report': ['document', 'statement', 'account', 'record', 'study'],
+    'increase': ['growth', 'rise', 'gain', 'advance', 'improvement'],
+    'decrease': ['reduction', 'decline', 'drop', 'fall', 'loss'],
+    'money': ['funds', 'cash', 'capital', 'finances', 'resources'],
+    'revenue': ['income', 'earnings', 'proceeds', 'returns', 'gains'],
+    'product': ['item', 'goods', 'merchandise', 'commodity', 'offering'],
+    'service': ['assistance', 'support', 'aid', 'help', 'utility'],
+    'market': ['marketplace', 'sector', 'industry', 'field', 'arena'],
+    'customer': ['client', 'consumer', 'buyer', 'purchaser', 'patron'],
+    'employee': ['worker', 'staff', 'personnel', 'associate', 'team member'],
+    'manager': ['supervisor', 'director', 'executive', 'administrator', 'leader'],
+    'quarterly': ['three-month', 'three-monthly', 'seasonal', 'periodic'],
+    'annual': ['yearly', 'per annum', 'once a year', 'twelve-month'],
+    'significant': ['substantial', 'considerable', 'important', 'major', 'notable'],
+    'growth': ['increase', 'expansion', 'development', 'advancement', 'progress']
+}
 
 def get_wordnet_pos(tag: str) -> str:
     """
@@ -37,6 +125,47 @@ def get_wordnet_pos(tag: str) -> str:
     else:
         return None
 
+def get_synonyms_from_wordnet(word: str, pos=None) -> List[str]:
+    """
+    Get synonyms for a word using WordNet.
+    
+    Args:
+        word: The word to find synonyms for
+        pos: Part of speech (optional)
+        
+    Returns:
+        List of synonyms
+    """
+    if not wordnet_available:
+        return []
+    
+    synonyms = []
+    
+    if pos:
+        synsets = wordnet.synsets(word, pos=pos)
+    else:
+        synsets = wordnet.synsets(word)
+        
+    for synset in synsets:
+        for lemma in synset.lemmas():
+            synonym = lemma.name().replace('_', ' ')
+            if synonym.lower() != word.lower() and synonym not in synonyms:
+                synonyms.append(synonym)
+                
+    return synonyms
+
+def get_synonyms_from_fallback(word: str) -> List[str]:
+    """
+    Get synonyms from the fallback dictionary.
+    
+    Args:
+        word: The word to find synonyms for
+        
+    Returns:
+        List of synonyms
+    """
+    return SIMPLE_SYNONYMS.get(word.lower(), [])
+
 def find_replaceable_word(text: str) -> Optional[Tuple[str, str, List[str], int, int]]:
     """
     Find a word in the text that can be replaced with a synonym.
@@ -47,40 +176,59 @@ def find_replaceable_word(text: str) -> Optional[Tuple[str, str, List[str], int,
     Returns:
         Tuple of (word, pos, synonyms, start_index, end_index) or None if no suitable word found
     """
-    # Tokenize and POS tag the text
-    tokens = nltk.word_tokenize(text)
-    tagged = nltk.pos_tag(tokens)
-    
-    # Look for content words (nouns, verbs, adjectives, adverbs)
     replaceable_words = []
     
-    for word, tag in tagged:
-        # Skip short words, stopwords, and non-content words
-        if len(word) <= 3 or not re.match(r'^[a-zA-Z]+$', word):
-            continue
+    # If we have NLTK resources, use them
+    if punkt_available and tagger_available:
+        # Tokenize and POS tag the text
+        tokens = nltk.word_tokenize(text)
+        tagged = nltk.pos_tag(tokens)
         
-        # Get WordNet POS
-        wordnet_pos = get_wordnet_pos(tag)
-        if not wordnet_pos:
-            continue
+        # Look for content words (nouns, verbs, adjectives, adverbs)
+        for word, tag in tagged:
+            # Skip short words, stopwords, and non-content words
+            if len(word) <= 3 or not re.match(r'^[a-zA-Z]+$', word):
+                continue
+            
+            # Get WordNet POS
+            wordnet_pos = get_wordnet_pos(tag)
+            
+            # Get synonyms
+            synonyms = []
+            
+            if wordnet_available and wordnet_pos:
+                synonyms = get_synonyms_from_wordnet(word, wordnet_pos)
+            
+            # If no synonyms from WordNet, try fallback
+            if not synonyms:
+                synonyms = get_synonyms_from_fallback(word)
+            
+            # Only consider words with at least one synonym
+            if synonyms:
+                # Find the start and end indices of this word in the original text
+                word_pattern = r'\b' + re.escape(word) + r'\b'
+                for match in re.finditer(word_pattern, text):
+                    # Avoid words in named entities (crude approximation)
+                    prev_char = text[match.start()-1] if match.start() > 0 else ' '
+                    if not prev_char.isupper():
+                        replaceable_words.append((word, wordnet_pos if wordnet_pos else 'UNK', synonyms, match.start(), match.end()))
+    else:
+        # Fallback method without NLTK
+        # Simple word extraction and fallback synonym lookup
+        words = re.findall(r'\b[a-zA-Z]{4,}\b', text)
         
-        # Get synonyms
-        synonyms = []
-        for synset in wordnet.synsets(word, pos=wordnet_pos):
-            for lemma in synset.lemmas():
-                synonym = lemma.name().replace('_', ' ')
-                if synonym.lower() != word.lower() and synonym not in synonyms:
-                    synonyms.append(synonym)
-        
-        # Only consider words with at least one synonym
-        if synonyms:
-            # Find the start and end indices of this word in the original text
-            word_pattern = r'\b' + re.escape(word) + r'\b'
-            for match in re.finditer(word_pattern, text):
-                # Avoid words in named entities (crude approximation)
-                prev_char = text[match.start()-1] if match.start() > 0 else ' '
-                if not prev_char.isupper():
-                    replaceable_words.append((word, wordnet_pos, synonyms, match.start(), match.end()))
+        for word in words:
+            # Check if we have fallback synonyms
+            synonyms = get_synonyms_from_fallback(word)
+            
+            if synonyms:
+                # Find the start and end indices of this word in the original text
+                word_pattern = r'\b' + re.escape(word) + r'\b'
+                for match in re.finditer(word_pattern, text):
+                    # Avoid words in named entities (crude approximation)
+                    prev_char = text[match.start()-1] if match.start() > 0 else ' '
+                    if not prev_char.isupper():
+                        replaceable_words.append((word, 'UNK', synonyms, match.start(), match.end()))
     
     # If we found replaceable words, choose one randomly
     if replaceable_words:

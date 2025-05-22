@@ -1,11 +1,20 @@
 # NLP libraries
-nltk#>=3.8.1
-spacy#>=3.7.2
-#wordnet>=0.0.1b2
+nltk
+spacy
+# Note: You don't need to install the standalone wordnet package as it's included in NLTK
 
 # Core dependencies
-numpy#>=1.26.3
-regex#>=2023.10.3
+numpy
+regex
+
+# Optional: If you want to use the transformer-based model for better entity recognition
+# transformers>=4.30.0
+# torch>=2.0.0
+
+# Install notes:
+# 1. To download spaCy models manually, visit: https://spacy.io/models
+# 2. After downloading, specify the path in config.json
+# 3. For NLTK resources, you can download them manually and specify the path in config.json
 
 # Download the English language model for spaCy
 # Run: python -m spacy download en_core_web_sm 

@@ -2,16 +2,58 @@ import re
 import random
 from typing import Optional, List, Tuple, Dict, Any
 import spacy
+import os
+import sys
+import importlib.util
+from pathlib import Path
 
-# Load spaCy model for named entity recognition
+# Import our configuration
+from .config import get_config
+
+# Load spaCy model based on configuration
+config = get_config()
+spacy_config = config.get_spacy_model_info()
+model_name = spacy_config.get("name", "en_core_web_sm")
+local_path = spacy_config.get("local_path", None)
+use_local_model = spacy_config.get("use_local_model", False)
+
 try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    # If the model is not installed, we need to install it
-    import subprocess
-    import sys
-    subprocess.check_call([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
-    nlp = spacy.load("en_core_web_sm")
+    if use_local_model and local_path:
+        # Path to the manually downloaded model
+        model_path = Path(local_path)
+        
+        if model_path.exists():
+            print(f"Loading spaCy model from local path: {model_path}")
+            # Load from the specified path
+            if importlib.util.find_spec("spacy.cli.info") is not None:
+                # This approach works with newer spaCy versions
+                nlp = spacy.load(model_path)
+            else:
+                # Alternative approach for older spaCy versions
+                model_path_str = str(model_path)
+                sys.path.insert(0, model_path_str)
+                nlp = importlib.import_module(model_name).load()
+                sys.path.pop(0)
+        else:
+            print(f"Warning: Local model path {model_path} not found, falling back to installed model")
+            nlp = spacy.load(model_name)
+    else:
+        # Load the installed model
+        nlp = spacy.load(model_name)
+        
+except OSError as e:
+    print(f"Error loading spaCy model: {e}")
+    print("Attempting to download the model...")
+    try:
+        # If the model is not installed, we need to install it
+        import subprocess
+        subprocess.check_call([sys.executable, "-m", "spacy", "download", model_name])
+        nlp = spacy.load(model_name)
+    except Exception as download_error:
+        print(f"Failed to download spaCy model: {download_error}")
+        print("Using a simpler approach for entity recognition...")
+        # Fallback to a very simple entity recognition method
+        nlp = None
 
 def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
     """
@@ -23,6 +65,10 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
     Returns:
         Tuple of (original_text, list_of_entities, start_index, end_index) or None if no list found
     """
+    if nlp is None:
+        # Fallback method if spaCy is not available
+        return _find_entity_list_simple(text)
+    
     # Process the text with spaCy
     doc = nlp(text)
     
@@ -50,6 +96,35 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
             if len(contained_entities) >= 2:
                 entity_list = [ent[0] for ent in contained_entities]
                 return (match_text, entity_list, match_start, match_end)
+    
+    return None
+
+def _find_entity_list_simple(text: str) -> Optional[Tuple[str, List[str], int, int]]:
+    """
+    A simple fallback method to find potential entity lists when spaCy is not available.
+    This uses simple regex patterns to identify potential lists of capitalized names.
+    
+    Args:
+        text: The input text
+    
+    Returns:
+        Tuple of (original_text, list_of_entities, start_index, end_index) or None if no list found
+    """
+    # Look for patterns like "Name1, Name2 and Name3" where names are capitalized
+    list_pattern = r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:,\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)+(?:\s+and\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)?)'
+    
+    for match in re.finditer(list_pattern, text):
+        match_text = match.group()
+        match_start = match.start()
+        match_end = match.end()
+        
+        # Extract potential entities from the match
+        # Split by commas and "and"
+        potential_entities = re.split(r',\s+|\s+and\s+', match_text)
+        potential_entities = [e.strip() for e in potential_entities if e.strip()]
+        
+        if len(potential_entities) >= 2:
+            return (match_text, potential_entities, match_start, match_end)
     
     return None
 
