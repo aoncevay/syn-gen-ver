@@ -77,7 +77,7 @@ def convert_literal_to_numeric(value: float, scale: str) -> str:
     total_value = value * multiplier
     
     # Format with commas
-    if total_value.is_integer():
+    if float(total_value).is_integer():
         formatted = f"${int(total_value):,}"
     else:
         formatted = f"${total_value:,.2f}"
@@ -109,7 +109,7 @@ def convert_numeric_to_literal(value: float) -> str:
         scaled_value = value / 1_000
     
     # Format the scaled value
-    if scaled_value.is_integer():
+    if float(scaled_value).is_integer():
         formatted = f"${int(scaled_value)} {scale}"
     else:
         # Round to at most 2 decimal places
