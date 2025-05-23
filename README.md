@@ -21,20 +21,16 @@ The recommended directory structure for this project is:
 syn-gen-ver/              # Project root
 ├── data/                 # Input and output data
 │   └── sample.json       # Sample input data
-├── models/               # Language models directory
-│   └── en_core_web_trf-3.8.0/  # Extracted spaCy model files
 ├── src/                  # Source code
 │   ├── config.json       # Configuration file
-│   ├── main.py           # Main script
-│   ├── perturbation/     # Perturbation modules
-│   └── tests/            # Unit tests
-├── setup_model.sh        # Script to install models
-└── requirements.txt      # Dependencies
+│   ├── main.py          # Main script
+│   ├── perturbation/    # Perturbation modules
+│   └── tests/           # Unit tests
+├── setup.py             # Setup script for NLTK data
+└── requirements.txt     # Dependencies
 ```
 
 ## Setup
-
-### Standard Setup
 
 1. Clone the repository:
 
@@ -49,50 +45,19 @@ cd syn-gen-ver
 pip install -r requirements.txt
 ```
 
-3. Download the required NLTK data:
+3. Run the setup script to download required NLTK data:
 
 ```bash
-python -c "import nltk; nltk.download('punkt'); nltk.download('wordnet'); nltk.download('averaged_perceptron_tagger')"
+python setup.py
 ```
 
-4. Download the spaCy model:
+This setup script will:
+- Download all required NLTK data packages (tokenizers, taggers, etc.)
+- Create any necessary data directories
+- Verify the installation
+- Handle custom data paths if configured
 
-```bash
-python -m spacy download en_core_web_sm
-```
-
-### Setup for Restricted Environments
-
-If you're working in an environment with restricted internet access or package installation limitations:
-
-1. Manually download the spaCy model from [the spaCy models page](https://spacy.io/models)
-   - The downloaded file will typically have a name like `en_core_web_trf-3.8.0-py3-none-any.whl`
-
-2. Place the downloaded wheel file in the models directory:
-   ```
-   models/en_core_web_trf-3.8.0-py3-none-any.whl
-   ```
-
-3. Use the setup script to install and configure the model:
-
-   ```bash
-   # For local installation (extracts to models/ directory)
-   chmod +x setup_model.sh
-   ./setup_model.sh models/en_core_web_trf-3.8.0-py3-none-any.whl local
-   
-   # OR for global installation (using pip)
-   ./setup_model.sh models/en_core_web_trf-3.8.0-py3-none-any.whl global
-   ```
-
-   The script will:
-   - Extract/install the model
-   - Update the config.json file automatically
-   - Create a backup of the original config
-
-4. Manually download NLTK data (if needed):
-   - Visit the [NLTK data page](https://www.nltk.org/nltk_data/)
-   - Download the required packages (punkt, wordnet, averaged_perceptron_tagger)
-   - Place them in a directory and update the `nltk.data_path` in config.json
+The setup script is safe to run multiple times - it will skip already downloaded packages.
 
 ## Usage
 
@@ -157,11 +122,6 @@ The system can be configured using a `config.json` file in the project root or `
 
 ```json
 {
-    "spacy_model": {
-        "name": "en_core_web_trf",          // Name of the spaCy model to use
-        "local_path": "models/en_core_web_trf-3.8.0",  // Path to extracted model (if use_local_model is true)
-        "use_local_model": true             // Whether to use a local model or installed model
-    },
     "nltk": {
         "data_path": null,                 // Custom path to NLTK data
         "download_enabled": true           // Whether to allow downloading NLTK resources
@@ -215,12 +175,9 @@ To add new perturbation types:
 ## Troubleshooting
 
 - **Path Issues**: If you encounter path-related errors, make sure you're running the commands from the project root directory.
-- **Model Not Found**: Verify that the path in your config.json correctly points to where you placed the extracted model.
 - **Import Errors**: Ensure your Python environment has all required dependencies installed.
-- **Model Installation Issues**: 
-  - For issues with the wheel file, run the setup script with the appropriate parameters
-  - Check the model name matches what's in your config.json
-  - For manual installations, ensure the spaCy model version is compatible with your Python version
+- **NLTK Data Issues**: Run `setup.py` again to ensure all required NLTK data is downloaded.
+- **Custom Data Path**: If using a custom NLTK data path, make sure it's correctly specified in config.json.
 
 ## Fallback Mechanisms
 

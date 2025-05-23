@@ -1,85 +1,16 @@
 import re
 import random
 from typing import Optional, List, Tuple, Dict, Any
-import spacy
-import os
-import sys
-import importlib.util
-from pathlib import Path
+import nltk
+from nltk import ne_chunk, pos_tag, word_tokenize
+from nltk.tree import Tree
 
 # Import our configuration
 from .config import get_config
 
-class SpacyModelManager:
-    """
-    Class to manage the loading and caching of the spaCy model.
-    Implements the Singleton pattern to ensure only one instance exists.
-    """
-    _instance = None
-    _model = None
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(SpacyModelManager, cls).__new__(cls)
-            cls._instance._config = get_config()
-            cls._instance._spacy_config = cls._instance._config.get_spacy_model_info()
-        return cls._instance
-    
-    def get_model(self):
-        """
-        Get the spaCy model, loading it if necessary.
-        
-        Returns:
-            The loaded spaCy model or None if loading fails
-        """
-        # Return cached model if already loaded
-        if self._model is not None:
-            return self._model
-        
-        # Get model configuration
-        model_name = self._spacy_config.get("name", "en_core_web_sm")
-        local_path = self._spacy_config.get("local_path", None)
-        use_local_model = self._spacy_config.get("use_local_model", False)
-        
-        try:
-            if use_local_model and local_path:
-                # Path to the local model
-                model_path = Path(local_path)
-                
-                if model_path.exists():
-                    print(f"Loading spaCy model from local path: {model_path}")
-                    # Load from the specified path
-                    self._model = spacy.load(model_path)
-                else:
-                    print(f"Warning: Local model path {model_path} not found, falling back to installed model")
-                    self._model = spacy.load(model_name)
-            else:
-                # Load the installed model
-                print(f"Loading spaCy model: {model_name}")
-                self._model = spacy.load(model_name)
-                
-        except OSError as e:
-            print(f"Error loading spaCy model: {e}")
-            print("Attempting to download the model...")
-            try:
-                # If the model is not installed, we need to install it
-                import subprocess
-                subprocess.check_call([sys.executable, "-m", "spacy", "download", model_name])
-                self._model = spacy.load(model_name)
-            except Exception as download_error:
-                print(f"Failed to download spaCy model: {download_error}")
-                print("Using a simpler approach for entity recognition...")
-                # Fallback to a very simple entity recognition method
-                self._model = None
-        
-        return self._model
-
-# Initialize a global model manager (but don't load the model yet)
-model_manager = SpacyModelManager()
-
 def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
     """
-    Find a list of named entities (people or organizations) in the text.
+    Find a list of named entities (people or organizations) in the text using NLTK.
     
     Args:
         text: The input text
@@ -87,46 +18,57 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
     Returns:
         Tuple of (original_text, list_of_entities, start_index, end_index) or None if no list found
     """
-    # Get the model from the manager (loads it if needed)
-    model = model_manager.get_model()
-    
-    if model is None:
-        # Fallback method if spaCy is not available
-        return _find_entity_list_simple(text)
-    
-    # Process the text with spaCy
-    doc = model(text)
-    
-    # Extract entities of type PERSON or ORG
-    entities = [(ent.text, ent.start_char, ent.end_char, ent.label_) 
-                for ent in doc.ents 
-                if ent.label_ in ["PERSON", "ORG"]]
-    
-    # Find contiguous lists of entities separated by commas, 'and', or other list separators
-    if len(entities) >= 2:
-        # Look for patterns like "A, B and C" or "A, B, C, and D"
-        list_pattern = r'([^,.]+(?:,\s*|\s+and\s+|\s*&\s*)[^,.]+(?:,\s*|\s+and\s+|\s*&\s*)[^,.]+)'
+    try:
+        # Tokenize and tag the text
+        tokens = word_tokenize(text)
+        tagged = pos_tag(tokens)
         
-        for match in re.finditer(list_pattern, text):
-            match_text = match.group()
-            match_start = match.start()
-            match_end = match.end()
+        # Extract named entities
+        named_entities = []
+        chunks = ne_chunk(tagged)
+        
+        for chunk in chunks:
+            if isinstance(chunk, Tree):
+                if chunk.label() in ['PERSON', 'ORGANIZATION']:
+                    entity = ' '.join([token for token, pos in chunk.leaves()])
+                    # Find the position of this entity in the original text
+                    start = text.find(entity)
+                    if start != -1:
+                        named_entities.append((entity, start, start + len(entity)))
+        
+        # Sort entities by their position in text
+        named_entities.sort(key=lambda x: x[1])
+        
+        # If we have at least 2 entities, look for list patterns
+        if len(named_entities) >= 2:
+            # Look for patterns like "A, B and C" or "A, B, C, and D"
+            list_pattern = r'([^,.]+(?:,\s*|\s+and\s+|\s*&\s*)[^,.]+(?:,\s*|\s+and\s+|\s*&\s*)[^,.]+)'
             
-            # Check if this match contains multiple entities
-            contained_entities = [
-                ent for ent in entities 
-                if ent[1] >= match_start and ent[2] <= match_end
-            ]
-            
-            if len(contained_entities) >= 2:
-                entity_list = [ent[0] for ent in contained_entities]
-                return (match_text, entity_list, match_start, match_end)
-    
-    return None
+            for match in re.finditer(list_pattern, text):
+                match_text = match.group()
+                match_start = match.start()
+                match_end = match.end()
+                
+                # Check which entities are in this match
+                contained_entities = [
+                    ent for ent, start, end in named_entities 
+                    if start >= match_start and end <= match_end
+                ]
+                
+                if len(contained_entities) >= 2:
+                    return (match_text, contained_entities, match_start, match_end)
+        
+        # If no list pattern found, try simple regex-based approach
+        return _find_entity_list_simple(text)
+        
+    except Exception as e:
+        print(f"Error in NLTK processing: {e}")
+        # Fallback to simple pattern matching
+        return _find_entity_list_simple(text)
 
 def _find_entity_list_simple(text: str) -> Optional[Tuple[str, List[str], int, int]]:
     """
-    A simple fallback method to find potential entity lists when spaCy is not available.
+    A simple fallback method to find potential entity lists using regex patterns.
     This uses simple regex patterns to identify potential lists of capitalized names.
     
     Args:
@@ -187,9 +129,6 @@ def reconstruct_text_with_entities(original_text: str, original_entities: List[s
     Returns:
         The reconstructed text with reordered entities
     """
-    # This is a simplified approach that might not work for all cases
-    # For a more robust solution, you would need to track the exact positions of entities and separators
-    
     result = original_text
     
     # Replace each original entity with its reordered counterpart
