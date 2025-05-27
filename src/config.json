@@ -1,7 +1,6 @@
 {
     "nltk": {
-        "data_path": null,
-        "download_enabled": false
+        "download_enabled": true
     },
     "perturbation": {
         "enabled_types": ["date_format", "entity_reorder", "number_rephrase", "synonym"]
