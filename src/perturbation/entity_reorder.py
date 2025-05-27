@@ -45,8 +45,8 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
         
         # If we have at least 2 entities, look for list patterns
         if len(named_entities) >= 2:
-            # Look for patterns like "A, B and C" or "A, B, C, and D"
-            list_pattern = r'([^,.]+(?:,\s*|\s+and\s+|\s*&\s*)[^,.]+(?:,\s*|\s+and\s+|\s*&\s*)[^,.]+)'
+            # Look for patterns like "A and B" or "A, B, and C"
+            list_pattern = r'([^,.]+(?:\s*(?:,|and|&)\s*[^,.]+)+)'
             
             for match in re.finditer(list_pattern, text):
                 match_text = match.group()
