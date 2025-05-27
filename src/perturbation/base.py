@@ -10,8 +10,6 @@ class PerturbationManager:
     def __init__(self):
         self.perturbation_functions = {}
         self.usage_counts = {}  # Track how many times each perturbation is used
-        self.attempt_counts = {}  # Track how many attempts for each type
-        self.max_attempts_per_type = 1000  # Maximum attempts before skipping a type
     
     def register_perturbation(self, name: str, func: Callable):
         """
@@ -23,7 +21,6 @@ class PerturbationManager:
         """
         self.perturbation_functions[name] = func
         self.usage_counts[name] = 0  # Initialize usage count
-        self.attempt_counts[name] = 0  # Initialize attempt count
     
     def get_available_perturbations(self) -> List[str]:
         """
@@ -39,11 +36,8 @@ class PerturbationManager:
         print("\nPerturbation Statistics:")
         print("------------------------")
         for name in self.perturbation_functions.keys():
-            success_rate = (self.usage_counts[name] / max(1, self.attempt_counts[name])) * 100
             print(f"{name}:")
             print(f"  Successful: {self.usage_counts[name]}")
-            print(f"  Attempts: {self.attempt_counts[name]}")
-            print(f"  Success Rate: {success_rate:.1f}%")
         print("------------------------")
     
     def apply_perturbation(self, text: str, perturbation_type: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -59,10 +53,6 @@ class PerturbationManager:
         """
         if perturbation_type and perturbation_type in self.perturbation_functions:
             # Apply specific perturbation
-            self.attempt_counts[perturbation_type] += 1
-            if self.attempt_counts[perturbation_type] % 100 == 0:
-                print(f"Attempted {perturbation_type} {self.attempt_counts[perturbation_type]} times...")
-            
             result = self.perturbation_functions[perturbation_type](text)
             if result:
                 self.usage_counts[perturbation_type] += 1
@@ -71,20 +61,11 @@ class PerturbationManager:
             # Sort perturbations by usage count (least used first)
             perturbation_types = sorted(
                 self.perturbation_functions.keys(),
-                key=lambda x: (self.usage_counts[x], self.attempt_counts[x])  # Sort by usage, then attempts
+                key=lambda x: self.usage_counts[x]
             )
             
             # Try perturbations in order of least used
             for pert_type in perturbation_types:
-                # Skip if we've tried this type too many times
-                if self.attempt_counts[pert_type] >= self.max_attempts_per_type:
-                    continue
-                
-                self.attempt_counts[pert_type] += 1
-                if self.attempt_counts[pert_type] % 100 == 0:
-                    print(f"Attempted {pert_type} {self.attempt_counts[pert_type]} times...")
-                    self.print_stats()
-                
                 result = self.perturbation_functions[pert_type](text)
                 if result:
                     self.usage_counts[pert_type] += 1
@@ -105,27 +86,16 @@ class PerturbationManager:
         # Split text into sentences with their spans
         sentence_spans = get_sentence_spans(text)
         
-        # Sort perturbations by usage count and attempt count
+        # Sort perturbations by usage count
         perturbation_types = sorted(
-            [p for p in self.perturbation_functions.keys() 
-             if self.attempt_counts[p] < self.max_attempts_per_type],
-            key=lambda x: (self.usage_counts[x], self.attempt_counts[x])
+            self.perturbation_functions.keys(),
+            key=lambda x: self.usage_counts[x]
         )
-        
-        if not perturbation_types:
-            print("All perturbation types have reached maximum attempts!")
-            self.print_stats()
-            return None
         
         # Try each sentence
         for sentence, start, end in sentence_spans:
             # Try each perturbation type on this sentence
             for pert_type in perturbation_types:
-                self.attempt_counts[pert_type] += 1
-                if self.attempt_counts[pert_type] % 100 == 0:
-                    print(f"Attempted {pert_type} {self.attempt_counts[pert_type]} times...")
-                    self.print_stats()
-                
                 result = self.perturbation_functions[pert_type](sentence)
                 
                 if result:
