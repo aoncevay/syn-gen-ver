@@ -105,30 +105,35 @@ class PerturbationManager:
         # Split text into sentences with their spans
         sentence_spans = get_sentence_spans(text)
         
-        # Sort perturbations by usage count and attempt count
+        # First try with balanced approach
         perturbation_types = sorted(
             [p for p in self.perturbation_functions.keys() 
              if self.attempt_counts[p] < self.max_attempts_per_type],
             key=lambda x: (self.usage_counts[x], self.attempt_counts[x])
         )
         
+        # If no perturbation types available or we've tried too many times,
+        # fall back to any available type that hasn't hit max attempts
+        if not perturbation_types:
+            print("\nFalling back to any available perturbation type...")
+            perturbation_types = [p for p in self.perturbation_functions.keys() 
+                                if self.attempt_counts[p] < self.max_attempts_per_type]
+        
         if not perturbation_types:
             print("All perturbation types have reached maximum attempts!")
             self.print_stats()
             return None
         
-        # Try each perturbation type in order of least used
-        for pert_type in perturbation_types:
-            # Try each sentence
-            for sentence, start, end in sentence_spans:
-                # Try to apply this perturbation type to this sentence
+        # Try each sentence with each perturbation type
+        for sentence, start, end in sentence_spans:
+            # First try least used perturbation types
+            for pert_type in perturbation_types:
                 self.attempt_counts[pert_type] += 1
                 if self.attempt_counts[pert_type] % 100 == 0:
                     print(f"Attempted {pert_type} {self.attempt_counts[pert_type]} times...")
                     self.print_stats()
                 
                 result = self.perturbation_functions[pert_type](sentence)
-                
                 if result:
                     # If we found a perturbation, update the full text
                     perturbed_sentence = result["perturbed_text"]
@@ -142,6 +147,25 @@ class PerturbationManager:
                         "updated_statement": full_perturbed_text,
                         "operations": [result["operation"]]
                     }
+            
+            # If no perturbation worked with balanced approach, try any type that works
+            if any(self.attempt_counts[p] < self.max_attempts_per_type for p in self.perturbation_functions):
+                print("\nTrying any available perturbation type...")
+                for pert_type in self.perturbation_functions:
+                    if self.attempt_counts[pert_type] >= self.max_attempts_per_type:
+                        continue
+                        
+                    self.attempt_counts[pert_type] += 1
+                    result = self.perturbation_functions[pert_type](sentence)
+                    if result:
+                        perturbed_sentence = result["perturbed_text"]
+                        full_perturbed_text = replace_span_in_text(text, start, end, perturbed_sentence)
+                        self.usage_counts[pert_type] += 1
+                        return {
+                            "statement": text,
+                            "updated_statement": full_perturbed_text,
+                            "operations": [result["operation"]]
+                        }
         
         # No perturbation was applied
         return None 
