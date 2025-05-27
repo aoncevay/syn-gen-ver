@@ -27,7 +27,7 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
         # Extract named entities
         named_entities = []
         chunks = ne_chunk(tagged)
-        print(f"Found chunks: {chunks}")
+        #print(f"Found chunks: {chunks}")
         
         for chunk in chunks:
             if isinstance(chunk, Tree):

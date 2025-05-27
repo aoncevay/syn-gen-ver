@@ -9,6 +9,7 @@ class PerturbationManager:
     
     def __init__(self):
         self.perturbation_functions = {}
+        self.usage_counts = {}  # Track how many times each perturbation is used
     
     def register_perturbation(self, name: str, func: Callable):
         """
@@ -19,6 +20,7 @@ class PerturbationManager:
             func: Perturbation function
         """
         self.perturbation_functions[name] = func
+        self.usage_counts[name] = 0  # Initialize usage count
     
     def get_available_perturbations(self) -> List[str]:
         """
@@ -42,15 +44,22 @@ class PerturbationManager:
         """
         if perturbation_type and perturbation_type in self.perturbation_functions:
             # Apply specific perturbation
-            return self.perturbation_functions[perturbation_type](text)
+            result = self.perturbation_functions[perturbation_type](text)
+            if result:
+                self.usage_counts[perturbation_type] += 1
+            return result
         else:
-            # Try all perturbations in random order
-            perturbation_types = list(self.perturbation_functions.keys())
-            random.shuffle(perturbation_types)
+            # Sort perturbations by usage count (least used first)
+            perturbation_types = sorted(
+                self.perturbation_functions.keys(),
+                key=lambda x: self.usage_counts[x]
+            )
             
+            # Try perturbations in order of least used
             for pert_type in perturbation_types:
                 result = self.perturbation_functions[pert_type](text)
                 if result:
+                    self.usage_counts[pert_type] += 1
                     return result
         
         return None
@@ -68,26 +77,32 @@ class PerturbationManager:
         # Split text into sentences with their spans
         sentence_spans = get_sentence_spans(text)
         
-        # Shuffle sentences to try perturbations in random order
-        shuffled_indices = list(range(len(sentence_spans)))
-        random.shuffle(shuffled_indices)
+        # Sort perturbations by usage count (least used first)
+        perturbation_types = sorted(
+            self.perturbation_functions.keys(),
+            key=lambda x: self.usage_counts[x]
+        )
         
-        for idx in shuffled_indices:
-            sentence, start, end = sentence_spans[idx]
-            
-            # Try to apply a perturbation to this sentence
-            result = self.apply_perturbation(sentence)
-            
-            if result:
-                # If we found a perturbation, update the full text
-                perturbed_sentence = result["perturbed_text"]
-                full_perturbed_text = replace_span_in_text(text, start, end, perturbed_sentence)
+        # Try each perturbation type in order of least used
+        for pert_type in perturbation_types:
+            # Try each sentence
+            for sentence, start, end in sentence_spans:
+                # Try to apply this perturbation type to this sentence
+                result = self.perturbation_functions[pert_type](sentence)
                 
-                return {
-                    "statement": text,
-                    "updated_statement": full_perturbed_text,
-                    "operations": [result["operation"]]
-                }
+                if result:
+                    # If we found a perturbation, update the full text
+                    perturbed_sentence = result["perturbed_text"]
+                    full_perturbed_text = replace_span_in_text(text, start, end, perturbed_sentence)
+                    
+                    # Update usage count
+                    self.usage_counts[pert_type] += 1
+                    
+                    return {
+                        "statement": text,
+                        "updated_statement": full_perturbed_text,
+                        "operations": [result["operation"]]
+                    }
         
         # No perturbation was applied
         return None 
