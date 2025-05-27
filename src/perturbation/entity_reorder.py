@@ -29,16 +29,23 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
         chunks = ne_chunk(tagged)
         #print(f"Found chunks: {chunks}")
         
+        # Keep track of where we've found entities to handle duplicates
+        last_end = 0
+        
         for chunk in chunks:
             if isinstance(chunk, Tree):
                 if chunk.label() in ['PERSON', 'ORGANIZATION']:
                     entity = ' '.join([token for token, pos in chunk.leaves()])
-                    # Find the position of this entity in the original text
-                    start = text.find(entity)
+                    # Find the position of this entity after the last one we found
+                    start = text.find(entity, last_end)
                     if start != -1:
-                        named_entities.append((entity, start, start + len(entity)))
+                        last_end = start + len(entity)
+                        named_entities.append((entity, start, last_end))
         
-        #print(f"Found named entities: {named_entities}")
+        # Remove duplicates while preserving order
+        seen = set()
+        named_entities = [(e, s, end) for e, s, end in named_entities 
+                         if not (e in seen or seen.add(e))]
         
         # Sort entities by their position in text
         named_entities.sort(key=lambda x: x[1])
@@ -46,7 +53,8 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
         # If we have at least 2 entities, look for list patterns
         if len(named_entities) >= 2:
             # Look for patterns like "A and B" or "A, B, and C"
-            list_pattern = r'([^,.]+(?:\s*(?:,|and|&)\s*[^,.]+)+)'
+            # Tighten the pattern to require word boundaries
+            list_pattern = r'\b([^,.]+(?:\s*(?:,|and|&)\s*[^,.]+)+)\b'
             
             for match in re.finditer(list_pattern, text):
                 match_text = match.group()
@@ -60,8 +68,11 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
                 ]
                 
                 if len(contained_entities) >= 2:
-                    #print(f"Found entity list: {contained_entities}")
-                    return (match_text, contained_entities, match_start, match_end)
+                    # Remove duplicates while preserving order
+                    contained_entities = list(dict.fromkeys(contained_entities))
+                    if len(contained_entities) >= 2:  # Check again after deduplication
+                        #print(f"Found entity list: {contained_entities}")
+                        return (match_text, contained_entities, match_start, match_end)
         
         #print("No list pattern found, trying simple regex approach...")
         # If no list pattern found, try simple regex-based approach
