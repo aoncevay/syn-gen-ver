@@ -73,25 +73,53 @@ def process_statements(input_data: List[Dict[str, Any]], max_perturbations: int 
     # List to store results
     results = []
     count = 0
+    total_attempts = 0
     
     # Shuffle input data to get a diverse sample
     shuffled_data = input_data.copy()
     random.shuffle(shuffled_data)
     
-    for item in shuffled_data:
+    print(f"\nProcessing {len(shuffled_data)} statements...")
+    print(f"Enabled perturbation types: {enabled_types or 'all'}")
+    print(f"Maximum perturbations to generate: {max_perturbations or 'unlimited'}\n")
+    
+    for i, item in enumerate(shuffled_data, 1):
         if "statement" in item:
             statement = item["statement"]
+            print(f"\nProcessing statement {i}/{len(shuffled_data)}: {statement[:100]}...")
             
             # Apply perturbation at sentence level
             result = perturbation_manager.apply_sentence_level_perturbation(statement)
+            total_attempts += 1
             
             if result:
+                print(f"✓ Successfully applied {result['operations'][0]['Target']} perturbation")
                 results.append(result)
                 count += 1
                 
+                # Print current stats every 5 successful perturbations
+                if count % 5 == 0:
+                    perturbation_manager.print_stats()
+                
                 # Stop if we've reached the maximum
                 if max_perturbations and count >= max_perturbations:
+                    print(f"\nReached maximum number of perturbations ({max_perturbations})")
                     break
+            else:
+                print("✗ No valid perturbation found for this statement")
+            
+            # Print progress every 10 statements
+            if i % 10 == 0:
+                print(f"\nProgress: {i}/{len(shuffled_data)} statements processed")
+                print(f"Successful perturbations: {count}")
+                perturbation_manager.print_stats()
+    
+    # Print final statistics
+    print("\nFinal Statistics:")
+    print(f"Total statements processed: {i}")
+    print(f"Total successful perturbations: {count}")
+    print(f"Overall success rate: {(count/total_attempts)*100:.1f}%")
+    perturbation_manager.print_stats()
     
     return results
 
