@@ -54,13 +54,12 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
         if len(named_entities) >= 2:
             # Look for proper list patterns:
             # - "Entity1 and Entity2"
-            # - "Entity1, Entity2"
-            # - "Entity1, Entity2, and Entity3"
+            # - "Entity1, Entity2, and Entity3" (3+ entities)
             list_patterns = [
                 # Two entities connected by "and"
                 r'\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*\s+and\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\b',
-                # Multiple entities with commas and optional "and"
-                r'\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*(?:\s*,\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)+(?:\s*(?:,\s+and|and)\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)?)\b'
+                # Three or more entities with commas and required "and"
+                r'\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*(?:\s*,\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)+\s*,\s+and\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\b'
             ]
             
             for pattern in list_patterns:
@@ -83,8 +82,8 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
                             ent1 = contained_entities[i]
                             ent2 = contained_entities[i+1]
                             between_text = text[text.find(ent1, match_start) + len(ent1):text.find(ent2, match_start)].strip()
-                            # Only allow ", " or " and " between entities
-                            if not re.match(r'^(?:,\s+|,\s+and\s+|and\s+)$', between_text):
+                            # Only allow ", and " or " and " between entities
+                            if not re.match(r'^(?:,\s+and\s+|and\s+)$', between_text):
                                 valid_separators = False
                                 break
                         
@@ -116,12 +115,12 @@ def _find_entity_list_simple(text: str) -> Optional[Tuple[str, List[str], int, i
     """
     #print("Using simple regex-based entity detection...")
     # Look for proper lists of capitalized names
-    # Format: "Name1, Name2 and Name3" or "Name1 and Name2"
+    # Format: "Name1 and Name2" or "Name1, Name2, and Name3"
     list_patterns = [
         # Two capitalized names connected by "and"
         r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+and\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
-        # Multiple capitalized names with commas and optional "and"
-        r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:\s*,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)+(?:\s*(?:,|and)\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)?)'
+        # Three or more names with commas and required "and"
+        r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:\s*,\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)+\s*,\s+and\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)'
     ]
     
     for pattern in list_patterns:
@@ -132,7 +131,7 @@ def _find_entity_list_simple(text: str) -> Optional[Tuple[str, List[str], int, i
             
             # Split by commas and "and", being more strict about separators
             potential_entities = []
-            parts = re.split(r'\s*,\s*|\s+and\s+', match_text)
+            parts = re.split(r'\s*,\s+and\s+|\s+and\s+', match_text)
             for part in parts:
                 part = part.strip()
                 # Only accept parts that look like proper names (capitalized words)
