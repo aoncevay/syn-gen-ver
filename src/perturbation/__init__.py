@@ -1,49 +1,37 @@
 from .base import PerturbationManager
-from .date_format import perturb_date_format
-from .entity_reorder import perturb_entity_reorder
-from .number_rephrase import perturb_number_rephrase
-from .synonym import perturb_synonym
 from typing import List, Optional
 
 __all__ = [
     'PerturbationManager',
-    'perturb_date_format',
-    'perturb_entity_reorder',
-    'perturb_number_rephrase',
-    'perturb_synonym',
     'create_perturbation_manager'
 ]
-
-# Map of perturbation type names to their functions
-PERTURBATION_FUNCTIONS = {
-    'date_format': perturb_date_format,
-    'entity_reorder': perturb_entity_reorder,
-    'number_rephrase': perturb_number_rephrase,
-    'synonym': perturb_synonym
-}
 
 def create_perturbation_manager(enabled_types: Optional[List[str]] = None) -> PerturbationManager:
     """
     Create and configure a perturbation manager with specified or all available perturbation types.
-    
     Args:
         enabled_types: List of perturbation type names to enable (None for all)
-    
     Returns:
         Configured PerturbationManager
     """
     manager = PerturbationManager()
-    
-    # If no specific types are provided, use all available perturbations
+
+    # Map of perturbation type names to their functions (imported only as needed)
+    perturbation_imports = {
+        'date_format': lambda: __import__(__name__ + '.date_format', fromlist=['perturb_date_format']).perturb_date_format,
+        'entity_reorder': lambda: __import__(__name__ + '.entity_reorder', fromlist=['perturb_entity_reorder']).perturb_entity_reorder,
+        'number_rephrase': lambda: __import__(__name__ + '.number_rephrase', fromlist=['perturb_number_rephrase']).perturb_number_rephrase,
+        'synonym': lambda: __import__(__name__ + '.synonym', fromlist=['perturb_synonym']).perturb_synonym
+    }
+
     if enabled_types is None:
-        for name, func in PERTURBATION_FUNCTIONS.items():
+        enabled_types = list(perturbation_imports.keys())
+
+    for name in enabled_types:
+        if name in perturbation_imports:
+            func = perturbation_imports[name]()
             manager.register_perturbation(name, func)
-    else:
-        # Register only the enabled perturbation types
-        for name in enabled_types:
-            if name in PERTURBATION_FUNCTIONS:
-                manager.register_perturbation(name, PERTURBATION_FUNCTIONS[name])
-            else:
-                print(f"Warning: Unknown perturbation type '{name}' specified")
-    
+        else:
+            print(f"Warning: Unknown perturbation type '{name}' specified")
+
     return manager 
