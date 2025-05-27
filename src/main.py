@@ -77,7 +77,7 @@ def process_statements(input_data: List[Dict[str, Any]], max_perturbations: int 
     
     # Shuffle input data to get a diverse sample
     shuffled_data = input_data.copy()
-    random.shuffle(shuffled_data)
+    #random.shuffle(shuffled_data)
     
     print(f"\nProcessing {len(shuffled_data)} statements...")
     print(f"Enabled perturbation types: {enabled_types or 'all'}")
