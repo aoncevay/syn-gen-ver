@@ -52,27 +52,47 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
         
         # If we have at least 2 entities, look for list patterns
         if len(named_entities) >= 2:
-            # Look for patterns like "A and B" or "A, B, and C"
-            # Tighten the pattern to require word boundaries
-            list_pattern = r'\b([^,.]+(?:\s*(?:,|and|&)\s*[^,.]+)+)\b'
+            # Look for proper list patterns:
+            # - "Entity1 and Entity2"
+            # - "Entity1, Entity2"
+            # - "Entity1, Entity2, and Entity3"
+            list_patterns = [
+                # Two entities connected by "and"
+                r'\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*\s+and\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\b',
+                # Multiple entities with commas and optional "and"
+                r'\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*(?:\s*,\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)+(?:\s*(?:,\s+and|and)\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)?)\b'
+            ]
             
-            for match in re.finditer(list_pattern, text):
-                match_text = match.group()
-                match_start = match.start()
-                match_end = match.end()
-                
-                # Check which entities are in this match
-                contained_entities = [
-                    ent for ent, start, end in named_entities 
-                    if start >= match_start and end <= match_end
-                ]
-                
-                if len(contained_entities) >= 2:
-                    # Remove duplicates while preserving order
-                    contained_entities = list(dict.fromkeys(contained_entities))
-                    if len(contained_entities) >= 2:  # Check again after deduplication
-                        #print(f"Found entity list: {contained_entities}")
-                        return (match_text, contained_entities, match_start, match_end)
+            for pattern in list_patterns:
+                for match in re.finditer(pattern, text):
+                    match_text = match.group()
+                    match_start = match.start()
+                    match_end = match.end()
+                    
+                    # Check which entities are in this match
+                    contained_entities = [
+                        ent for ent, start, end in named_entities 
+                        if start >= match_start and end <= match_end
+                    ]
+                    
+                    # Validate that the entities are properly separated
+                    if len(contained_entities) >= 2:
+                        # Get the text between entities to verify proper separation
+                        valid_separators = True
+                        for i in range(len(contained_entities)-1):
+                            ent1 = contained_entities[i]
+                            ent2 = contained_entities[i+1]
+                            between_text = text[text.find(ent1, match_start) + len(ent1):text.find(ent2, match_start)].strip()
+                            # Only allow ", " or " and " between entities
+                            if not re.match(r'^(?:,\s+|,\s+and\s+|and\s+)$', between_text):
+                                valid_separators = False
+                                break
+                        
+                        if valid_separators:
+                            # Remove duplicates while preserving order
+                            contained_entities = list(dict.fromkeys(contained_entities))
+                            if len(contained_entities) >= 2:  # Check again after deduplication
+                                return (match_text, contained_entities, match_start, match_end)
         
         #print("No list pattern found, trying simple regex approach...")
         # If no list pattern found, try simple regex-based approach
@@ -95,22 +115,36 @@ def _find_entity_list_simple(text: str) -> Optional[Tuple[str, List[str], int, i
         Tuple of (original_text, list_of_entities, start_index, end_index) or None if no list found
     """
     #print("Using simple regex-based entity detection...")
-    # Look for patterns like "Name1, Name2 and Name3" where names are capitalized
-    list_pattern = r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:,\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)+(?:\s+and\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)?)'
+    # Look for proper lists of capitalized names
+    # Format: "Name1, Name2 and Name3" or "Name1 and Name2"
+    list_patterns = [
+        # Two capitalized names connected by "and"
+        r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+and\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+        # Multiple capitalized names with commas and optional "and"
+        r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:\s*,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)+(?:\s*(?:,|and)\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)?)'
+    ]
     
-    for match in re.finditer(list_pattern, text):
-        match_text = match.group()
-        match_start = match.start()
-        match_end = match.end()
-        
-        # Extract potential entities from the match
-        # Split by commas and "and"
-        potential_entities = re.split(r',\s+|\s+and\s+', match_text)
-        potential_entities = [e.strip() for e in potential_entities if e.strip()]
-        
-        if len(potential_entities) >= 2:
-            #print(f"Found entities using regex: {potential_entities}")
-            return (match_text, potential_entities, match_start, match_end)
+    for pattern in list_patterns:
+        for match in re.finditer(pattern, text):
+            match_text = match.group()
+            match_start = match.start()
+            match_end = match.end()
+            
+            # Split by commas and "and", being more strict about separators
+            potential_entities = []
+            parts = re.split(r'\s*,\s*|\s+and\s+', match_text)
+            for part in parts:
+                part = part.strip()
+                # Only accept parts that look like proper names (capitalized words)
+                if re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$', part):
+                    potential_entities.append(part)
+            
+            if len(potential_entities) >= 2:
+                # Remove duplicates while preserving order
+                potential_entities = list(dict.fromkeys(potential_entities))
+                if len(potential_entities) >= 2:
+                    #print(f"Found entities using regex: {potential_entities}")
+                    return (match_text, potential_entities, match_start, match_end)
     
     #print("No entities found using regex either.")
     return None
