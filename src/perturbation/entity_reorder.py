@@ -19,7 +19,7 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
         Tuple of (original_text, list_of_entities, start_index, end_index) or None if no list found
     """
     try:
-        print("Attempting NLTK entity recognition...")
+        #print("Attempting NLTK entity recognition...")
         # Tokenize and tag the text
         tokens = word_tokenize(text)
         tagged = pos_tag(tokens)
@@ -38,7 +38,7 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
                     if start != -1:
                         named_entities.append((entity, start, start + len(entity)))
         
-        print(f"Found named entities: {named_entities}")
+        #print(f"Found named entities: {named_entities}")
         
         # Sort entities by their position in text
         named_entities.sort(key=lambda x: x[1])
@@ -60,15 +60,15 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
                 ]
                 
                 if len(contained_entities) >= 2:
-                    print(f"Found entity list: {contained_entities}")
+                    #print(f"Found entity list: {contained_entities}")
                     return (match_text, contained_entities, match_start, match_end)
         
-        print("No list pattern found, trying simple regex approach...")
+        #print("No list pattern found, trying simple regex approach...")
         # If no list pattern found, try simple regex-based approach
         return _find_entity_list_simple(text)
         
     except Exception as e:
-        print(f"Error in NLTK processing: {e}")
+        #print(f"Error in NLTK processing: {e}")
         # Fallback to simple pattern matching
         return _find_entity_list_simple(text)
 
@@ -83,7 +83,7 @@ def _find_entity_list_simple(text: str) -> Optional[Tuple[str, List[str], int, i
     Returns:
         Tuple of (original_text, list_of_entities, start_index, end_index) or None if no list found
     """
-    print("Using simple regex-based entity detection...")
+    #print("Using simple regex-based entity detection...")
     # Look for patterns like "Name1, Name2 and Name3" where names are capitalized
     list_pattern = r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:,\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)+(?:\s+and\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)?)'
     
@@ -98,10 +98,10 @@ def _find_entity_list_simple(text: str) -> Optional[Tuple[str, List[str], int, i
         potential_entities = [e.strip() for e in potential_entities if e.strip()]
         
         if len(potential_entities) >= 2:
-            print(f"Found entities using regex: {potential_entities}")
+            #print(f"Found entities using regex: {potential_entities}")
             return (match_text, potential_entities, match_start, match_end)
     
-    print("No entities found using regex either.")
+    #print("No entities found using regex either.")
     return None
 
 def reorder_entities(entity_list: List[str]) -> List[str]:
