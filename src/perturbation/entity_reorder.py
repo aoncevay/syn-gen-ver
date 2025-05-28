@@ -11,6 +11,7 @@ from .config import get_config
 def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
     """
     Find a list of named entities (people or organizations) in the text using NLTK.
+    Filters out pronouns and other unwanted entities.
     
     Args:
         text: The input text
@@ -18,6 +19,9 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
     Returns:
         Tuple of (original_text, list_of_entities, start_index, end_index) or None if no list found
     """
+    # Common pronouns to filter out
+    PRONOUNS = {'I', 'We', 'You', 'He', 'She', 'It', 'They', 'Me', 'Us', 'Him', 'Her', 'Them'}
+    
     try:
         #print("Attempting NLTK entity recognition...")
         # Tokenize and tag the text
@@ -36,6 +40,9 @@ def find_entity_list(text: str) -> Optional[Tuple[str, List[str], int, int]]:
             if isinstance(chunk, Tree):
                 if chunk.label() in ['PERSON', 'ORGANIZATION']:
                     entity = ' '.join([token for token, pos in chunk.leaves()])
+                    # Skip if the entity is a pronoun
+                    if entity in PRONOUNS or any(word in PRONOUNS for word in entity.split()):
+                        continue
                     # Find the position of this entity after the last one we found
                     start = text.find(entity, last_end)
                     if start != -1:
@@ -106,6 +113,7 @@ def _find_entity_list_simple(text: str) -> Optional[Tuple[str, List[str], int, i
     """
     A simple fallback method to find potential entity lists using regex patterns.
     This uses simple regex patterns to identify potential lists of capitalized names.
+    Filters out pronouns and other unwanted entities.
     
     Args:
         text: The input text
@@ -113,6 +121,9 @@ def _find_entity_list_simple(text: str) -> Optional[Tuple[str, List[str], int, i
     Returns:
         Tuple of (original_text, list_of_entities, start_index, end_index) or None if no list found
     """
+    # Common pronouns to filter out
+    PRONOUNS = {'I', 'We', 'You', 'He', 'She', 'It', 'They', 'Me', 'Us', 'Him', 'Her', 'Them'}
+    
     #print("Using simple regex-based entity detection...")
     # Look for proper lists of capitalized names
     # Format: "Name1 and Name2" or "Name1, Name2, and Name3"
@@ -135,7 +146,10 @@ def _find_entity_list_simple(text: str) -> Optional[Tuple[str, List[str], int, i
             for part in parts:
                 part = part.strip()
                 # Only accept parts that look like proper names (capitalized words)
-                if re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$', part):
+                # and are not pronouns
+                if (re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$', part) and 
+                    part not in PRONOUNS and 
+                    not any(word in PRONOUNS for word in part.split())):
                     potential_entities.append(part)
             
             if len(potential_entities) >= 2:

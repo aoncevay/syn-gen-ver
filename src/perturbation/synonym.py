@@ -79,29 +79,28 @@ except LookupError:
     else:
         print("POS tagger not available and downloads disabled")
 
-# Fallback simple word synonyms for common words
+# Fallback simple adjective synonyms
 SIMPLE_SYNONYMS = {
     'big': ['large', 'huge', 'enormous', 'substantial', 'significant'],
     'small': ['tiny', 'little', 'miniature', 'minute', 'compact'],
     'good': ['great', 'excellent', 'fine', 'quality', 'superior'],
     'bad': ['poor', 'inferior', 'substandard', 'inadequate', 'unsatisfactory'],
     'important': ['significant', 'crucial', 'essential', 'vital', 'key'],
-    'company': ['business', 'corporation', 'enterprise', 'firm', 'organization'],
-    'report': ['document', 'statement', 'account', 'record', 'study'],
-    'increase': ['growth', 'rise', 'gain', 'advance', 'improvement'],
-    'decrease': ['reduction', 'decline', 'drop', 'fall', 'loss'],
-    'money': ['funds', 'cash', 'capital', 'finances', 'resources'],
-    'revenue': ['income', 'earnings', 'proceeds', 'returns', 'gains'],
-    'product': ['item', 'goods', 'merchandise', 'commodity', 'offering'],
-    'service': ['assistance', 'support', 'aid', 'help', 'utility'],
-    'market': ['marketplace', 'sector', 'industry', 'field', 'arena'],
-    'customer': ['client', 'consumer', 'buyer', 'purchaser', 'patron'],
-    'employee': ['worker', 'staff', 'personnel', 'associate', 'team member'],
-    'manager': ['supervisor', 'director', 'executive', 'administrator', 'leader'],
-    'quarterly': ['three-month', 'three-monthly', 'seasonal', 'periodic'],
-    'annual': ['yearly', 'per annum', 'once a year', 'twelve-month'],
     'significant': ['substantial', 'considerable', 'important', 'major', 'notable'],
-    'growth': ['increase', 'expansion', 'development', 'advancement', 'progress']
+    'new': ['novel', 'modern', 'recent', 'fresh', 'innovative'],
+    'old': ['ancient', 'aged', 'vintage', 'traditional', 'classic'],
+    'fast': ['quick', 'rapid', 'swift', 'speedy', 'prompt'],
+    'slow': ['gradual', 'leisurely', 'unhurried', 'measured', 'deliberate'],
+    'strong': ['powerful', 'robust', 'sturdy', 'solid', 'vigorous'],
+    'weak': ['feeble', 'fragile', 'delicate', 'frail', 'flimsy'],
+    'high': ['elevated', 'tall', 'lofty', 'towering', 'soaring'],
+    'low': ['minimal', 'modest', 'slight', 'minor', 'reduced'],
+    'effective': ['efficient', 'productive', 'successful', 'useful', 'beneficial'],
+    'ineffective': ['inefficient', 'unproductive', 'unsuccessful', 'useless', 'futile'],
+    'expensive': ['costly', 'premium', 'high-priced', 'valuable', 'premium'],
+    'cheap': ['inexpensive', 'affordable', 'economical', 'reasonable', 'budget-friendly'],
+    'difficult': ['challenging', 'complex', 'complicated', 'demanding', 'tough'],
+    'easy': ['simple', 'straightforward', 'uncomplicated', 'effortless', 'manageable']
 }
 
 def get_wordnet_pos(tag: str) -> str:
@@ -168,13 +167,13 @@ def get_synonyms_from_fallback(word: str) -> List[str]:
 
 def find_replaceable_word(text: str) -> Optional[Tuple[str, str, List[str], int, int]]:
     """
-    Find a word in the text that can be replaced with a synonym.
+    Find an adjective in the text that can be replaced with a synonym.
     
     Args:
         text: The input text
     
     Returns:
-        Tuple of (word, pos, synonyms, start_index, end_index) or None if no suitable word found
+        Tuple of (word, pos, synonyms, start_index, end_index) or None if no suitable adjective found
     """
     replaceable_words = []
     
@@ -184,53 +183,41 @@ def find_replaceable_word(text: str) -> Optional[Tuple[str, str, List[str], int,
         tokens = nltk.word_tokenize(text)
         tagged = nltk.pos_tag(tokens)
         
-        # Look for content words (nouns, verbs, adjectives, adverbs)
+        # Look for adjectives only
         for word, tag in tagged:
-            # Skip short words, stopwords, and non-content words
+            # Skip short words and non-alphabetic words
             if len(word) <= 3 or not re.match(r'^[a-zA-Z]+$', word):
                 continue
             
-            # Get WordNet POS
-            wordnet_pos = get_wordnet_pos(tag)
+            # Only process adjectives (tags starting with 'JJ')
+            if not tag.startswith('JJ'):
+                continue
             
             # Get synonyms
             synonyms = []
             
-            if wordnet_available and wordnet_pos:
-                synonyms = get_synonyms_from_wordnet(word, wordnet_pos)
+            if wordnet_available:
+                synonyms = get_synonyms_from_wordnet(word, wordnet.ADJ)
             
-            # If no synonyms from WordNet, try fallback
+            # If no WordNet synonyms found, try fallback dictionary
             if not synonyms:
                 synonyms = get_synonyms_from_fallback(word)
             
-            # Only consider words with at least one synonym
+            # If we found synonyms, find the word position in text
             if synonyms:
-                # Find the start and end indices of this word in the original text
-                word_pattern = r'\b' + re.escape(word) + r'\b'
-                for match in re.finditer(word_pattern, text):
-                    # Avoid words in named entities (crude approximation)
-                    prev_char = text[match.start()-1] if match.start() > 0 else ' '
-                    if not prev_char.isupper():
-                        replaceable_words.append((word, wordnet_pos if wordnet_pos else 'UNK', synonyms, match.start(), match.end()))
+                # Find the word in text (respecting word boundaries)
+                pattern = r'\b' + re.escape(word) + r'\b'
+                for match in re.finditer(pattern, text):
+                    replaceable_words.append((word, tag, synonyms, match.start(), match.end()))
     else:
-        # Fallback method without NLTK
-        # Simple word extraction and fallback synonym lookup
-        words = re.findall(r'\b[a-zA-Z]{4,}\b', text)
-        
-        for word in words:
-            # Check if we have fallback synonyms
-            synonyms = get_synonyms_from_fallback(word)
-            
+        # Fallback to simple dictionary lookup if NLTK is not available
+        for word in re.finditer(r'\b[a-zA-Z]{4,}\b', text):
+            word_text = word.group()
+            synonyms = get_synonyms_from_fallback(word_text)
             if synonyms:
-                # Find the start and end indices of this word in the original text
-                word_pattern = r'\b' + re.escape(word) + r'\b'
-                for match in re.finditer(word_pattern, text):
-                    # Avoid words in named entities (crude approximation)
-                    prev_char = text[match.start()-1] if match.start() > 0 else ' '
-                    if not prev_char.isupper():
-                        replaceable_words.append((word, 'UNK', synonyms, match.start(), match.end()))
+                replaceable_words.append((word_text, 'JJ', synonyms, word.start(), word.end()))
     
-    # If we found replaceable words, choose one randomly
+    # If we found any replaceable words, return a random one
     if replaceable_words:
         return random.choice(replaceable_words)
     
