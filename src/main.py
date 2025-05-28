@@ -71,7 +71,7 @@ def process_statements(input_data: List[Dict[str, Any]], max_perturbations: int 
     perturbation_manager = create_perturbation_manager(enabled_types)
     
     # List to store results
-    results = []
+    all_results = []
     count = 0
     total_attempts = 0
     
@@ -89,21 +89,27 @@ def process_statements(input_data: List[Dict[str, Any]], max_perturbations: int 
             print(f"\nProcessing statement {i}/{len(shuffled_data)}: {statement[:100]}...")
             
             # Apply perturbation at sentence level
-            result = perturbation_manager.apply_sentence_level_perturbation(statement)
+            results = perturbation_manager.apply_sentence_level_perturbation(statement)
             total_attempts += 1
             
-            if result:
-                print(f"✓ Successfully applied {result['operations'][0]['Target']} perturbation")
-                results.append(result)
-                count += 1
+            if results:
+                # We might have multiple perturbations for the same statement
+                for result in results:
+                    pert_type = result['operations'][0]['Target']
+                    print(f"✓ Successfully applied {pert_type} perturbation")
+                    all_results.append(result)
+                    count += 1
+                    
+                    # Stop if we've reached the maximum
+                    if max_perturbations and count >= max_perturbations:
+                        print(f"\nReached maximum number of perturbations ({max_perturbations})")
+                        break
                 
                 # Print current stats every 5 successful perturbations
                 if count % 5 == 0:
                     perturbation_manager.print_stats()
                 
-                # Stop if we've reached the maximum
                 if max_perturbations and count >= max_perturbations:
-                    print(f"\nReached maximum number of perturbations ({max_perturbations})")
                     break
             else:
                 print("✗ No valid perturbation found for this statement")
@@ -121,7 +127,7 @@ def process_statements(input_data: List[Dict[str, Any]], max_perturbations: int 
     print(f"Overall success rate: {(count/total_attempts)*100:.1f}%")
     perturbation_manager.print_stats()
     
-    return results
+    return all_results
 
 def main():
     """

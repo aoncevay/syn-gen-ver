@@ -249,7 +249,8 @@ def perturb_synonym(text: str) -> Optional[Dict[str, Any]]:
             "operation": {
                 "Target": "synonym",
                 "From": word,
-                "To": synonym
+                "To": synonym,
+                "Type": "Supported"
             }
         }
     

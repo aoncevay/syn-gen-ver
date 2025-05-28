@@ -129,7 +129,8 @@ def perturb_date_format(text: str) -> Optional[Dict[str, Any]]:
                 "operation": {
                     "Target": "date_format",
                     "From": original_date,
-                    "To": perturbed_date
+                    "To": perturbed_date,
+                    "Type": "Supported"
                 }
             }
     
@@ -145,7 +146,8 @@ def perturb_date_format(text: str) -> Optional[Dict[str, Any]]:
                 "operation": {
                     "Target": "date_format",
                     "From": original_date,
-                    "To": perturbed_date
+                    "To": perturbed_date,
+                    "Type": "Supported"
                 }
             }
     

@@ -139,7 +139,8 @@ def perturb_number_rephrase(text: str) -> Optional[Dict[str, Any]]:
             "operation": {
                 "Target": "number_rephrase",
                 "From": original_text,
-                "To": perturbed_text
+                "To": perturbed_text,
+                "Type": "Supported"
             }
         }
     
@@ -154,7 +155,8 @@ def perturb_number_rephrase(text: str) -> Optional[Dict[str, Any]]:
             "operation": {
                 "Target": "number_rephrase",
                 "From": original_text,
-                "To": perturbed_text
+                "To": perturbed_text,
+                "Type": "Supported"
             }
         }
     

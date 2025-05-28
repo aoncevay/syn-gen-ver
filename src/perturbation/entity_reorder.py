@@ -239,7 +239,8 @@ def perturb_entity_reorder(text: str) -> Optional[Dict[str, Any]]:
                         "operation": {
                             "Target": "entity_reorder",
                             "From": original_text,
-                            "To": reconstructed_text
+                            "To": reconstructed_text,
+                            "Type": "Supported"
                         }
                     }
     
